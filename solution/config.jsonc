@@ -1,0 +1,83 @@
+// The envelope builds everything from this file: parameters, context, keys,
+// encryption. It is read once per point, before anything is measured. `//`
+// starts a comment. Parameters marked for another scheme are ignored.
+//
+// SEAL states its modulus chain as a list of prime sizes and takes the last
+// of them as the special prime of the key switch, so what is named here are
+// the sizes and the depth and the envelope assembles the list.
+{
+  // Encryption scheme: "ckks" | "bgv" | "bfv".
+  //   ckks    — approximate arithmetic over real numbers.
+  //   bgv/bfv — exact arithmetic over integers modulo plaintext_modulus.
+  // SEAL has no bootstrapping, so every circuit here is leveled: what the
+  // chain carries is what run() may spend.
+  // Your encoding/run/decoding must match what is named here.
+  "scheme": "ckks",
+
+  // Security floor, held against the whole coeff_modulus — the levels and
+  // the special prime together — as the HE standard's table has it for this
+  // ring. A set that does not reach it is refused before anything runs.
+  //   "tc128" | "tc192" | "tc256"
+  //
+  // Who does the refusing depends on the ring. Up to 32768 it is SEAL, from
+  // its own copy of the table; SEAL reports an unusable context rather than
+  // throwing on one, so the envelope asks and raises. Above 32768 SEAL's
+  // table has no row and would refuse everything, so the envelope carries the
+  // standard's remaining rows and holds log QP against them itself.
+  "security": "tc128",
+
+  // ── all schemes ──────────────────────────────────────────────────────────
+
+  // Ring dimension, a power of two. More room for depth at the declared
+  // security level, and more slots; slower and larger in the same measure.
+  "poly_modulus_degree": 32768,
+
+  // What the ring packs. Not a choice here — CKKS packs exactly half the
+  // ring, bgv and bfv exactly the ring — but declared, because a point's
+  // slot count is part of what makes two answers comparable. The envelope
+  // refuses a number the ring does not give; 0 declares nothing.
+  "slot_count": 16384,
+
+  // Multiplicative depth: how many primes stand between the first modulus
+  // and the special prime, and so how many rescalings run() may perform.
+  // Each level costs modulus bits, and the ring must carry them at the
+  // declared security.
+  "mult_depth": 4,
+
+  // Rotations run() uses, by shift. A Galois key is generated for exactly
+  // this list; rotating by an undeclared shift fails at run time. Negative
+  // rotates the other way. Example: [1, -1, 2, 4]
+  //
+  // The relinearization key is always generated — nothing multiplies without
+  // it — and SEAL has no separate key for summing across slots: that is a
+  // rotate-and-add over the shifts declared here.
+  "rotation_key_indexes": [],
+
+  // ── ckks only ────────────────────────────────────────────────────────────
+
+  // Bits of scale per level: the precision every intermediate value carries.
+  // The envelope encodes at 2^scale_mod_size and a rescaling returns a
+  // product to it.
+  "scale_mod_size": 48,
+
+  // Bits of the first modulus: the precision the result is read at once the
+  // levels are spent. Larger than scale_mod_size.
+  "first_mod_size": 60,
+
+  // Bits of the special prime, the one SEAL raises to for a key switch. At
+  // least as large as the largest other prime in the chain, and part of what
+  // the security floor above is held against.
+  "special_mod_size": 60,
+
+  // The chain written out instead, in bits, when the three numbers above are
+  // not how you want to state it: non-empty wins, and the last element is the
+  // special prime. [60, 50, 50, 60] is what the defaults assemble.
+  "coeff_modulus_bits": [],
+
+  // ── bgv / bfv only ───────────────────────────────────────────────────────
+
+  // The plaintext space: arithmetic is exact modulo this number. Prime, and
+  // 1 mod 2*poly_modulus_degree for slot packing — 65537 fits every
+  // power-of-two ring up to 32768.
+  "plaintext_modulus": 65537
+}
